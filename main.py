@@ -1,19 +1,68 @@
 from flask import Flask, render_template, request, redirect, url_for
+from flask_sqlalchemy import SQLAlchemy
+from flask_bootstrap import Bootstrap
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI']="sqlite:///books.db"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+Bootstrap(app)
+db=SQLAlchemy(app)
 
-all_books = []
+class Book(db.Model):
+    id=db.Column(db.Integer,primary_key=True)
+    title=db.Column(db.String(250),unique=True,nullable=False)
+    author=db.Column(db.String(250),nullable=False)
+    rating = db.Column(db.Float, nullable=False)
+
+def selectAll():
+    all_books = db.session.query(Book).all()
+    return all_books
+
+db.create_all()
+
 
 
 @app.route('/')
 def home():
-    pass
+    all_books = selectAll()
+    return render_template("index.html",books=all_books)
 
 
-@app.route("/add")
+@app.route("/add",methods=["GET","POST"])
 def add():
-    pass
+    if request.method=="POST":
+        new_book = Book(
+            title=request.form.get("name"),
+            author=request.form.get("author"),
+            rating=request.form.get("rating"),
+        )
+        db.session.add(new_book)
+        db.session.commit()
+        return redirect("/")
+    return render_template("add.html")
 
+@app.route("/edit",methods=["GET","POST"])
+def edit():
+    if request.method=="POST":
+        book_id=request.form["id"]
+        book_to_update=Book.query.get(book_id)
+        book_to_update.rating=request.form["rating"]
+        db.session.commit()
+        return redirect(url_for("home"))
+    
+    book_id=request.args.get('id')
+    book_selected=Book.query.get(book_id)
+    return render_template("edit_rating.html",book=book_selected)
+
+
+@app.route("/delete")
+def delete():
+    book_id = request.args.get('id')
+
+    book_to_delete = Book.query.get(book_id)
+    db.session.delete(book_to_delete)
+    db.session.commit()
+    return redirect(url_for('home'))
 
 if __name__ == "__main__":
     app.run(debug=True)
